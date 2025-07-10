@@ -1,385 +1,1939 @@
+// @ts-nocheck
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, Alert, Linking } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  StatusBar, 
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert
+} from 'react-native';
 
 export default function HomeScreen() {
-  const [currentScreen, setCurrentScreen] = useState<'map' | 'chat' | null>(null);
+  // Estados para controlar o fluxo da aplicação
+  const [currentScreen, setCurrentScreen] = useState('home');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [selectedCleaner, setSelectedCleaner] = useState(null);
 
-  // WhatsApp Business number - CONFIGURADO PARA BRASÍLIA!
-  const WHATSAPP_NUMBER = '5561981416006';
+  // Estados para o AuthScreen
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+    phone: '',
+    confirmPassword: ''
+  });
+  const [errors, setErrors] = useState({});
 
+  // Estados para o LocationService
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [manualAddress, setManualAddress] = useState('');
+
+  // Estados para o ServiceSelection
+  const [selectedServices, setSelectedServices] = useState([]);
+  const [serviceTotal, setServiceTotal] = useState(0);
+  const [serviceDate, setServiceDate] = useState('');
+  const [serviceTime, setServiceTime] = useState('');
+
+  // Estados para o CleanerSelection
+  const [selectedCleanerId, setSelectedCleanerId] = useState(null);
+
+  // Dados das faxineiras
   const cleaners = [
-    { id: '1', name: 'Maria González', distance: '0.8 km', price: 'R$ 25/h', available: true, phone: '5561987654321' },
-    { id: '2', name: 'Ana Rodriguez', distance: '1.2 km', price: 'R$ 28/h', available: true, phone: '5561987654322' },
-    { id: '3', name: 'Carmen Silva', distance: '1.5 km', price: 'R$ 30/h', available: false, phone: '5561987654323' }
+    {
+      id: '1',
+      name: 'Maria Silva',
+      rating: 4.9,
+      experience: '5 anos',
+      price: 25,
+      avatar: '👩🏻‍💼',
+      specialties: ['Limpeza geral', 'Organização'],
+      reviews: 127,
+      description: 'Profissional experiente e dedicada',
+      available: true
+    },
+    {
+      id: '2',
+      name: 'Ana Santos',
+      rating: 4.8,
+      experience: '3 anos',
+      price: 22,
+      avatar: '👩🏽‍💼',
+      specialties: ['Limpeza profunda', 'Cozinha'],
+      reviews: 89,
+      description: 'Especialista em limpeza detalhada',
+      available: true
+    },
+    {
+      id: '3',
+      name: 'Carla Oliveira',
+      rating: 4.7,
+      experience: '7 anos',
+      price: 28,
+      avatar: '👩🏾‍💼',
+      specialties: ['Limpeza comercial', 'Escritórios'],
+      reviews: 203,
+      description: 'Experiente em ambientes comerciais',
+      available: false
+    },
+    {
+      id: '4',
+      name: 'Lucia Ferreira',
+      rating: 4.9,
+      experience: '4 anos',
+      price: 24,
+      avatar: '👩🏼‍💼',
+      specialties: ['Limpeza residencial', 'Banheiros'],
+      reviews: 156,
+      description: 'Cuidadosa com detalhes',
+      available: true
+    },
+    {
+      id: '5',
+      name: 'Rosa Costa',
+      rating: 4.6,
+      experience: '6 anos',
+      price: 26,
+      avatar: '👩🏻‍💼',
+      specialties: ['Limpeza pós-obra', 'Janelas'],
+      reviews: 98,
+      description: 'Especialista em limpezas pesadas',
+      available: true
+    }
   ];
 
+  // Dados dos serviços
   const services = [
-    { id: '1', name: 'Limpeza Residencial', price: 'R$ 80-150', icon: '🏠' },
-    { id: '2', name: 'Limpeza Comercial', price: 'R$ 120-300', icon: '🏢' },
-    { id: '3', name: 'Pós-Obra', price: 'R$ 200-400', icon: '🚧' },
-    { id: '4', name: 'Organização', price: 'R$ 60-120', icon: '✨' }
+    {
+      id: '1a',
+      name: 'Limpeza de geladeira',
+      price: 25,
+      description: 'Limpeza interna e externa',
+    },
+    {
+      id: '1b',
+      name: 'Limpeza de forno',
+      price: 20,
+      description: 'Limpeza interna completa',
+    },
+    {
+      id: '1c',
+      name: 'Organização de armários',
+      price: 30,
+      description: 'Organizar roupas e utensílios',
+    },
+    {
+      id: '1d',
+      name: 'Limpeza de janelas',
+      price: 15,
+      description: 'Limpeza interna das janelas',
+    },
   ];
 
-  // Função CORRIGIDA para abrir WhatsApp
-  const openWhatsApp = (phone: string, message: string) => {
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  const commercialServices = [
+    {
+      id: '2',
+      name: 'Limpeza Comercial',
+      icon: '🏢',
+      basePrice: 120,
+      duration: '3-6 horas',
+      description: 'Limpeza de escritórios, lojas e estabelecimentos comerciais',
+      includes: [
+        'Limpeza de salas e escritórios',
+        'Banheiros corporativos',
+        'Áreas comuns',
+        'Limpeza de mesas e equipamentos'
+      ],
+    },
+  ];
+
+  const additionalServices = [
+    {
+      id: '2a',
+      name: 'Limpeza de carpetes',
+      price: 40,
+      description: 'Aspiração profunda de carpetes',
+    },
+    {
+      id: '2b',
+      name: 'Limpeza de vidros externos',
+      price: 35,
+      description: 'Fachada e janelas externas',
+    },
+    {
+      id: '2c',
+      name: 'Desinfecção COVID-19',
+      price: 50,
+      description: 'Desinfecção com produtos específicos',
+    },
+    {
+      id: '2d',
+      name: 'Limpeza noturna',
+      price: 30,
+      description: 'Adicional para horário noturno',
+    },
+  ];
+
+  // Funções do AuthScreen
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
     
-    // Abre direto, sem verificação prévia
-    Linking.openURL(url).catch((err) => {
-      console.error('Erro ao abrir WhatsApp:', err);
-      
-      // Se falhar, mostra as informações para contato manual
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.email) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'Email inválido';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Senha é obrigatória';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
+    }
+
+    if (!isLogin) {
+      if (!formData.name) {
+        newErrors.name = 'Nome é obrigatório';
+      }
+
+      if (!formData.phone) {
+        newErrors.phone = 'Telefone é obrigatório';
+      }
+
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = 'Confirmação de senha é obrigatória';
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Senhas não coincidem';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogin = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const user = {
+        id: 'user_' + Date.now(),
+        name: isLogin ? formData.email.split('@')[0] : formData.name,
+        email: formData.email,
+        phone: formData.phone || '(11) 99999-9999'
+      };
+
+      setUserData(user);
+      setIsLoggedIn(true);
+      setCurrentScreen('home');
+
       Alert.alert(
-        'Contato WhatsApp', 
-        `📱 Número: ${phone}\n\n💬 Mensagem:\n${message}\n\nSe não abriu automaticamente, copie o número e mensagem, e envie no WhatsApp manualmente.`,
-        [
-          { text: 'Tentar Novamente', onPress: () => Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`) },
-          { text: 'OK' }
-        ]
+        isLogin ? 'Login realizado!' : 'Cadastro realizado!',
+        `Bem-vindo${isLogin ? ' de volta' : ''}, ${user.name}!`
       );
+
+    } catch (error) {
+      Alert.alert('Erro', 'Algo deu errado. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setIsLogin(!isLogin);
+    setErrors({});
+    setFormData({
+      email: formData.email,
+      password: '',
+      name: '',
+      phone: '',
+      confirmPassword: ''
     });
   };
 
-  // Função para contato geral
-  const contactWhatsApp = () => {
-    const message = `Olá! Vim pelo app Latinas e gostaria de saber mais sobre os serviços de limpeza! 🌟
-
-📍 Estou em: Brasília, DF
-📅 Preciso de: (informe o tipo de limpeza)
-🏠 Endereço: (informe seu endereço)
-
-Aguardo contato!`;
-
-    openWhatsApp(WHATSAPP_NUMBER, message);
+  // Funções do LocationService
+  const getCurrentLocation = () => {
+    setLocationLoading(true);
+    
+    setTimeout(() => {
+      const mockLocation = {
+        address: 'Setor Comercial Sul, Brasília - DF',
+        coordinates: { lat: -15.7942, lng: -47.8822 },
+        city: 'Brasília',
+        state: 'DF'
+      };
+      
+      setCurrentLocation(mockLocation);
+      setLocationLoading(false);
+    }, 2000);
   };
 
-  // Função para contratar faxineira específica
-  const contactCleaner = (cleaner: any) => {
-    const message = `Olá ${cleaner.name}! 👋
+  const handleManualLocation = () => {
+    if (!manualAddress.trim()) {
+      Alert.alert('Erro', 'Por favor, digite um endereço.');
+      return;
+    }
 
-Vim pelo app Latinas e gostaria de contratar seus serviços:
+    const location = {
+      address: manualAddress,
+      coordinates: { lat: -15.7942, lng: -47.8822 },
+      city: 'Brasília',
+      state: 'DF'
+    };
 
-📍 Localização: Brasília, DF
-💰 Preço visto: ${cleaner.price}
-📍 Distância: ${cleaner.distance}
-
-Pode me atender hoje? Aguardo seu contato!
-
-Obrigado! 🌟`;
-
-    openWhatsApp(cleaner.phone, message);
+    setUserLocation(location);
+    setCurrentScreen('home');
+    Alert.alert('Sucesso!', 'Localização definida com sucesso!');
   };
 
-  // Função para solicitar serviço específico
-  const selectService = (service: any) => {
+  const handleLocationConfirm = () => {
+    if (!currentLocation) {
+      Alert.alert('Erro', 'Por favor, obtenha sua localização primeiro.');
+      return;
+    }
+
+    setUserLocation(currentLocation);
+    setCurrentScreen('home');
+    Alert.alert('Sucesso!', 'Localização confirmada!');
+  };
+
+  // Funções do ServiceSelection
+  const toggleService = (service) => {
+    const isSelected = selectedServices.find(s => s.id === service.id);
+    let newServices;
+    
+    if (isSelected) {
+      newServices = selectedServices.filter(s => s.id !== service.id);
+    } else {
+      newServices = [...selectedServices, service];
+    }
+    
+    setSelectedServices(newServices);
+    
+    const total = newServices.reduce((sum, s) => sum + s.price, 0);
+    setServiceTotal(total);
+  };
+
+  const handleServiceConfirm = () => {
+    if (selectedServices.length === 0) {
+      Alert.alert('Atenção', 'Selecione pelo menos um serviço.');
+      return;
+    }
+
+    if (!serviceDate || !serviceTime) {
+      Alert.alert('Atenção', 'Selecione data e horário para o serviço.');
+      return;
+    }
+
+    const serviceData = {
+      services: selectedServices,
+      total: serviceTotal,
+      date: serviceDate,
+      time: serviceTime
+    };
+
+    setSelectedService(serviceData);
+    setCurrentScreen('cleaner');
+    
     Alert.alert(
-      service.name,
-      `Preço: ${service.price}\n\nComo deseja prosseguir?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Ver Faxineiras', onPress: () => setCurrentScreen('map') },
-        { text: 'WhatsApp Direto', onPress: () => contactServiceWhatsApp(service) }
-      ]
+      'Serviços Selecionados!',
+      `${selectedServices.length} serviço(s) - Total: R$ ${serviceTotal}`
     );
   };
 
-  // WhatsApp para serviço específico
-  const contactServiceWhatsApp = (service: any) => {
-    const message = `Olá! Vim pelo app Latinas e preciso de: ${service.name} 🧹
-
-💰 Preço visto: ${service.price}
-📍 Local: Brasília, DF
-📅 Para quando: (informe a data desejada)
-🏠 Endereço: (informe seu endereço completo)
-📞 Contato: (seu telefone)
-
-Observações:
-- Tamanho do ambiente: 
-- Tipo de limpeza específica:
-
-Aguardo orçamento! Obrigado! 🌟`;
-
-    openWhatsApp(WHATSAPP_NUMBER, message);
+  // Funções do CleanerSelection
+  const handleSelectCleaner = (cleanerId) => {
+    setSelectedCleanerId(cleanerId);
   };
 
-  const requestCleaner = (cleaner: any) => {
+  const handleCleanerConfirm = () => {
+    if (!selectedCleanerId) {
+      Alert.alert('Atenção', 'Por favor, selecione uma faxineira.');
+      return;
+    }
+
+    const cleaner = cleaners.find(c => c.id === selectedCleanerId);
+    setSelectedCleaner(cleaner);
+    setCurrentScreen('chat');
+    
     Alert.alert(
-      `Contatar ${cleaner.name}`,
-      `Distância: ${cleaner.distance}\nPreço: ${cleaner.price}\n\nComo deseja contatar?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'WhatsApp Direto', onPress: () => contactCleaner(cleaner) },
-        { text: 'Central Latinas', onPress: () => contactWhatsApp() }
-      ]
+      'Faxineira Selecionada!',
+      `${cleaner.name} foi selecionada. Você pode conversar com ela agora!`
     );
   };
 
-  // Tela do Mapa
-  if (currentScreen === 'map') {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.header}>
-          <TouchableOpacity onPress={() => setCurrentScreen(null)}>
-            <ThemedText style={styles.backBtn}>← Voltar</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.title}>Faxineiras Próximas</ThemedText>
-          <TouchableOpacity onPress={contactWhatsApp}>
-            <ThemedText style={styles.whatsappHeaderBtn}>💬</ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    
+    for (let i = 0; i < fullStars; i++) {
+      stars.push('⭐');
+    }
+    if (hasHalfStar) {
+      stars.push('✨');
+    }
+    return stars.join('');
+  };
 
-        <ThemedView style={styles.mapArea}>
-          <ThemedText style={styles.mapTitle}>🗺️ Mapa - Brasília, DF</ThemedText>
-          <ThemedText style={styles.mapSubtitle}>Toque nas faxineiras para contatar via WhatsApp</ThemedText>
-          
-          <ThemedView style={styles.pins}>
-            <ThemedText style={styles.pin}>📍 Você</ThemedText>
-            <TouchableOpacity onPress={() => contactCleaner(cleaners[0])}>
-              <ThemedText style={styles.pin}>👩🏽 Maria (0.8km) - Toque aqui</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => contactCleaner(cleaners[1])}>
-              <ThemedText style={styles.pin}>👩🏻 Ana (1.2km) - Toque aqui</ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
-        </ThemedView>
+  // Componente AuthScreen inline
+  const renderAuthScreen = () => (
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.authHeader}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => setCurrentScreen('home')}
+          >
+            <Text style={styles.backButtonText}>← Voltar</Text>
+          </TouchableOpacity>
+          <Text style={styles.authTitle}>
+            {isLogin ? 'Bem-vindo de volta!' : 'Criar conta'}
+          </Text>
+          <Text style={styles.authSubtitle}>
+            {isLogin ? 'Faça login para continuar' : 'Cadastre-se para começar'}
+          </Text>
+        </View>
 
-        <ThemedView style={styles.listArea}>
-          <ThemedText style={styles.listTitle}>Disponíveis Agora - Contato Direto</ThemedText>
-          
-          {cleaners.filter(c => c.available).map(cleaner => (
-            <TouchableOpacity 
-              key={cleaner.id}
-              style={styles.cleanerCard}
-              onPress={() => requestCleaner(cleaner)}
-            >
-              <ThemedView>
-                <ThemedText style={styles.cleanerName}>{cleaner.name}</ThemedText>
-                <ThemedText>Distância: {cleaner.distance}</ThemedText>
-                <ThemedText style={styles.price}>{cleaner.price}</ThemedText>
-              </ThemedView>
-              <ThemedView style={styles.cleanerActions}>
-                <ThemedText style={styles.available}>🟢 Disponível</ThemedText>
-                <ThemedText style={styles.whatsappIcon}>💬 WhatsApp</ThemedText>
-              </ThemedView>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.authForm}>
+          {!isLogin && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Nome completo *</Text>
+              <TextInput
+                style={[styles.input, errors.name && styles.inputError]}
+                placeholder="Digite seu nome completo"
+                value={formData.name}
+                onChangeText={(value) => handleInputChange('name', value)}
+                autoCapitalize="words"
+              />
+              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+            </View>
+          )}
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Email *</Text>
+            <TextInput
+              style={[styles.input, errors.email && styles.inputError]}
+              placeholder="Digite seu email"
+              value={formData.email}
+              onChangeText={(value) => handleInputChange('email', value)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Senha *</Text>
+            <TextInput
+              style={[styles.input, errors.password && styles.inputError]}
+              placeholder="Digite sua senha"
+              value={formData.password}
+              onChangeText={(value) => handleInputChange('password', value)}
+              secureTextEntry
+            />
+            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+          </View>
+
+          {!isLogin && (
+            <>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirmar senha *</Text>
+                <TextInput
+                  style={[styles.input, errors.confirmPassword && styles.inputError]}
+                  placeholder="Confirme sua senha"
+                  value={formData.confirmPassword}
+                  onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                  secureTextEntry
+                />
+                {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Telefone *</Text>
+                <TextInput
+                  style={[styles.input, errors.phone && styles.inputError]}
+                  placeholder="(11) 99999-9999"
+                  value={formData.phone}
+                  onChangeText={(value) => handleInputChange('phone', value)}
+                  keyboardType="phone-pad"
+                />
+                {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity 
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            <Text style={styles.submitButtonText}>
+              {loading ? 'Carregando...' : (isLogin ? 'Entrar' : 'Cadastrar')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.switchButton} onPress={toggleMode}>
+            <Text style={styles.switchButtonText}>
+              {isLogin ? 'Não tem conta? ' : 'Já tem conta? '}
+              <Text style={styles.switchButtonHighlight}>
+                {isLogin ? 'Cadastre-se' : 'Faça login'}
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+
+  // Componente LocationService inline
+  const renderLocationScreen = () => (
+    <View style={styles.container}>
+      <View style={styles.authHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setCurrentScreen('home')}
+        >
+          <Text style={styles.backButtonText}>← Voltar</Text>
+        </TouchableOpacity>
+        <Text style={styles.authTitle}>Sua Localização</Text>
+        <Text style={styles.authSubtitle}>Para encontrar faxineiras próximas a você</Text>
+      </View>
+
+      <ScrollView style={styles.authForm}>
+        <View style={styles.locationSection}>
+          <Text style={styles.locationSectionTitle}>🎯 Localização Automática</Text>
+          <Text style={styles.locationDescription}>
+            Permita o acesso à sua localização para encontrar faxineiras próximas
+          </Text>
           
           <TouchableOpacity 
-            style={styles.centralWhatsappBtn}
-            onPress={contactWhatsApp}
+            style={[styles.locationButton, locationLoading && styles.submitButtonDisabled]}
+            onPress={getCurrentLocation}
+            disabled={locationLoading}
           >
-            <ThemedText style={styles.centralWhatsappText}>
-              💬 Falar com Central Latinas via WhatsApp
-            </ThemedText>
+            <Text style={styles.locationButtonText}>
+              {locationLoading ? 'Obtendo localização...' : '📍 Obter Minha Localização'}
+            </Text>
           </TouchableOpacity>
-        </ThemedView>
-      </ThemedView>
-    );
-  }
 
-  // Tela do Chat (agora com botão WhatsApp)
-  if (currentScreen === 'chat') {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.header}>
-          <TouchableOpacity onPress={() => setCurrentScreen(null)}>
-            <ThemedText style={styles.backBtn}>← Voltar</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.title}>💬 Atendimento</ThemedText>
-          <TouchableOpacity onPress={contactWhatsApp}>
-            <ThemedText style={styles.whatsappHeaderBtn}>💬 WhatsApp</ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
-
-        <ScrollView style={styles.chatArea}>
-          <ThemedView style={styles.aiMsg}>
-            <ThemedText style={styles.aiName}>🤖 Sofia - IA Virtual</ThemedText>
-            <ThemedText>
-              Olá! Sou a assistente virtual! 🌟{'\n\n'}
-              Para atendimento humanizado e contratação imediata, 
-              use o botão WhatsApp acima! 📱{'\n\n'}
-              Ou continue aqui para:{'\n'}
-              • Consultar preços{'\n'}
-              • Ver informações{'\n'}
-              • Tirar dúvidas básicas
-            </ThemedText>
-          </ThemedView>
-
-          <ThemedView style={styles.userMsg}>
-            <ThemedText style={styles.userText}>Quais são os preços?</ThemedText>
-          </ThemedView>
-
-          <ThemedView style={styles.aiMsg}>
-            <ThemedText style={styles.aiName}>🤖 Sofia</ThemedText>
-            <ThemedText>
-              Nossos preços: 💰{'\n\n'}
-              🏠 Residencial: R$ 80-150{'\n'}
-              🏢 Comercial: R$ 120-300{'\n'}
-              🚧 Pós-obra: R$ 200-400{'\n'}
-              ✨ Organização: R$ 60-120{'\n\n'}
-              💬 Para orçamento personalizado, clique no WhatsApp acima!
-            </ThemedText>
-          </ThemedView>
-        </ScrollView>
-
-        <ThemedView style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickBtn} onPress={contactWhatsApp}>
-            <ThemedText style={styles.whatsappQuickText}>💬 WhatsApp Central</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => setCurrentScreen('map')}>
-            <ThemedText>🗺️ Ver Faxineiras</ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
-      </ThemedView>
-    );
-  }
-
-  // Tela Principal
-  return (
-    <ThemedView style={styles.container}>
-      <ThemedView style={styles.mapBg}>
-        <ThemedText style={styles.mapBgText}>🗺️ Brasília, DF</ThemedText>
-        
-        <ThemedView style={styles.bgPins}>
-          <ThemedText>📍</ThemedText>
-          <ThemedText>👩🏽</ThemedText>
-          <ThemedText>👩🏻</ThemedText>
-        </ThemedView>
-      </ThemedView>
-
-      <ThemedView style={styles.overlay}>
-        <ThemedView style={styles.topBar}>
-          <ThemedText style={styles.appTitle}>Latinas</ThemedText>
-          <ThemedText style={styles.subtitle}>Serviços de Limpeza</ThemedText>
-          <ThemedText>📍 Brasília, DF • 3 profissionais próximas</ThemedText>
-          
-          {/* Botão WhatsApp destacado */}
-          <TouchableOpacity style={styles.headerWhatsappBtn} onPress={contactWhatsApp}>
-            <ThemedText style={styles.headerWhatsappText}>💬 WhatsApp Central</ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
-
-        <ThemedView style={styles.mainCard}>
-          <ThemedText style={styles.cardTitle}>O que você precisa?</ThemedText>
-          <ThemedText style={styles.cardSubtitle}>Toque para orçamento via WhatsApp</ThemedText>
-          
-          <ThemedView style={styles.grid}>
-            {services.map(service => (
+          {currentLocation && (
+            <View style={styles.locationResult}>
+              <Text style={styles.locationResultTitle}>✅ Localização encontrada:</Text>
+              <Text style={styles.locationResultText}>{currentLocation.address}</Text>
               <TouchableOpacity 
-                key={service.id}
-                style={styles.serviceBtn}
-                onPress={() => selectService(service)}
+                style={styles.confirmLocationButton}
+                onPress={handleLocationConfirm}
               >
-                <ThemedText style={styles.icon}>{service.icon}</ThemedText>
-                <ThemedText style={styles.serviceName}>{service.name}</ThemedText>
-                <ThemedText style={styles.servicePrice}>{service.price}</ThemedText>
-                <ThemedText style={styles.whatsappLabel}>💬 WhatsApp</ThemedText>
+                <Text style={styles.confirmLocationText}>Confirmar Localização</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OU</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <View style={styles.locationSection}>
+          <Text style={styles.locationSectionTitle}>📝 Digite Manualmente</Text>
+          <Text style={styles.locationDescription}>
+            Digite seu endereço, bairro ou cidade
+          </Text>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Endereço</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: Asa Norte, Brasília - DF"
+              value={manualAddress}
+              onChangeText={setManualAddress}
+              multiline
+            />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.locationButton}
+            onPress={handleManualLocation}
+          >
+            <Text style={styles.locationButtonText}>📍 Definir Localização</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.locationSection}>
+          <Text style={styles.locationSectionTitle}>🌟 Localizações Populares</Text>
+          
+          {[
+            'Asa Norte, Brasília - DF',
+            'Asa Sul, Brasília - DF', 
+            'Águas Claras, Brasília - DF',
+            'Taguatinga, Brasília - DF',
+            'Ceilândia, Brasília - DF'
+          ].map((location, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.suggestedLocation}
+              onPress={() => {
+                const locationData = {
+                  address: location,
+                  coordinates: { lat: -15.7942, lng: -47.8822 },
+                  city: 'Brasília',
+                  state: 'DF'
+                };
+                setUserLocation(locationData);
+                setCurrentScreen('home');
+                Alert.alert('Sucesso!', `Localização definida: ${location}`);
+              }}
+            >
+              <Text style={styles.suggestedLocationText}>📍 {location}</Text>
+              <Text style={styles.suggestedLocationArrow}>→</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  // Componente ServiceSelection inline
+  const renderServiceScreen = () => (
+    <View style={styles.container}>
+      <View style={styles.authHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setCurrentScreen('home')}
+        >
+          <Text style={styles.backButtonText}>← Voltar</Text>
+        </TouchableOpacity>
+        <Text style={styles.authTitle}>Escolha os Serviços</Text>
+        <Text style={styles.authSubtitle}>Selecione o que precisa ser feito</Text>
+      </View>
+
+      <ScrollView style={styles.authForm}>
+        <View style={styles.serviceCategory}>
+          <Text style={styles.serviceCategoryTitle}>🏠 Serviços Residenciais</Text>
+          
+          {services.map((service) => {
+            const isSelected = selectedServices.find(s => s.id === service.id);
+            return (
+              <TouchableOpacity
+                key={service.id}
+                style={[
+                  styles.serviceOption,
+                  isSelected && styles.serviceOptionSelected
+                ]}
+                onPress={() => toggleService(service)}
+              >
+                <View style={styles.serviceOptionContent}>
+                  <View style={styles.serviceOptionInfo}>
+                    <Text style={styles.serviceOptionName}>{service.name}</Text>
+                    <Text style={styles.serviceOptionDescription}>{service.description}</Text>
+                  </View>
+                  <View style={styles.serviceOptionRight}>
+                    <Text style={styles.serviceOptionPrice}>R$ {service.price}</Text>
+                    <View style={[
+                      styles.checkbox,
+                      isSelected && styles.checkboxSelected
+                    ]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.serviceCategory}>
+          <Text style={styles.serviceCategoryTitle}>⭐ Serviços Adicionais</Text>
+          
+          {additionalServices.map((service) => {
+            const isSelected = selectedServices.find(s => s.id === service.id);
+            return (
+              <TouchableOpacity
+                key={service.id}
+                style={[
+                  styles.serviceOption,
+                  isSelected && styles.serviceOptionSelected
+                ]}
+                onPress={() => toggleService(service)}
+              >
+                <View style={styles.serviceOptionContent}>
+                  <View style={styles.serviceOptionInfo}>
+                    <Text style={styles.serviceOptionName}>{service.name}</Text>
+                    <Text style={styles.serviceOptionDescription}>{service.description}</Text>
+                  </View>
+                  <View style={styles.serviceOptionRight}>
+                    <Text style={styles.serviceOptionPrice}>R$ {service.price}</Text>
+                    <View style={[
+                      styles.checkbox,
+                      isSelected && styles.checkboxSelected
+                    ]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.serviceCategory}>
+          <Text style={styles.serviceCategoryTitle}>📅 Data e Horário</Text>
+          
+          <View style={styles.dateTimeContainer}>
+            <View style={styles.dateTimeItem}>
+              <Text style={styles.label}>Data do Serviço</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="DD/MM/AAAA"
+                value={serviceDate}
+                onChangeText={setServiceDate}
+                keyboardType="numeric"
+              />
+            </View>
+            
+            <View style={styles.dateTimeItem}>
+              <Text style={styles.label}>Horário</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="HH:MM"
+                value={serviceTime}
+                onChangeText={setServiceTime}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.suggestedTimesTitle}>⏰ Horários Populares:</Text>
+          <View style={styles.suggestedTimes}>
+            {['08:00', '09:00', '10:00', '14:00', '15:00', '16:00'].map((time) => (
+              <TouchableOpacity
+                key={time}
+                style={[
+                  styles.timeButton,
+                  serviceTime === time && styles.timeButtonSelected
+                ]}
+                onPress={() => setServiceTime(time)}
+              >
+                <Text style={[
+                  styles.timeButtonText,
+                  serviceTime === time && styles.timeButtonTextSelected
+                ]}>
+                  {time}
+                </Text>
               </TouchableOpacity>
             ))}
-          </ThemedView>
+          </View>
+        </View>
 
-          <ThemedView style={styles.actions}>
-            <TouchableOpacity 
-              style={styles.primaryBtn}
-              onPress={() => setCurrentScreen('map')}
-            >
-              <ThemedText style={styles.primaryText}>🗺️ Ver Faxineiras</ThemedText>
-            </TouchableOpacity>
+        {selectedServices.length > 0 && (
+          <View style={styles.summaryContainer}>
+            <Text style={styles.summaryTitle}>📋 Resumo do Pedido</Text>
             
-            <TouchableOpacity 
-              style={styles.whatsappBtn}
-              onPress={contactWhatsApp}
-            >
-              <ThemedText style={styles.whatsappBtnText}>💬 WhatsApp</ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
-        </ThemedView>
+            {selectedServices.map((service) => (
+              <View key={service.id} style={styles.summaryItem}>
+                <Text style={styles.summaryItemName}>{service.name}</Text>
+                <Text style={styles.summaryItemPrice}>R$ {service.price}</Text>
+              </View>
+            ))}
+            
+            <View style={styles.summaryTotal}>
+              <Text style={styles.summaryTotalText}>Total: R$ {serviceTotal}</Text>
+            </View>
+          </View>
+        )}
 
         <TouchableOpacity 
-          style={styles.emergency}
+          style={[
+            styles.confirmButton,
+            selectedServices.length === 0 && styles.confirmButtonDisabled
+          ]}
+          onPress={handleServiceConfirm}
+          disabled={selectedServices.length === 0}
+        >
+          <Text style={styles.confirmButtonText}>
+            {selectedServices.length === 0 
+              ? 'Selecione pelo menos um serviço'
+              : `Continuar com ${selectedServices.length} serviço(s) - R$ ${serviceTotal}`
+            }
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+
+  // Componente CleanerSelection inline completo
+  const renderCleanerScreen = () => (
+    <View style={styles.container}>
+      <View style={styles.authHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setCurrentScreen('service')}
+        >
+          <Text style={styles.backButtonText}>← Voltar</Text>
+        </TouchableOpacity>
+        <Text style={styles.authTitle}>Escolha sua Faxineira</Text>
+        <Text style={styles.authSubtitle}>Selecione a profissional ideal para você</Text>
+      </View>
+
+      <ScrollView style={styles.authForm} showsVerticalScrollIndicator={false}>
+        {cleaners.map((cleaner) => (
+          <View key={cleaner.id} style={styles.cleanerCard}>
+            <TouchableOpacity
+              style={[
+                styles.cleanerCardContent,
+                selectedCleanerId === cleaner.id && styles.cleanerCardSelected,
+                !cleaner.available && styles.cleanerCardUnavailable
+              ]}
+              onPress={() => cleaner.available && handleSelectCleaner(cleaner.id)}
+              disabled={!cleaner.available}
+            >
+              <View style={styles.cleanerHeader}>
+                <View style={styles.avatarContainer}>
+                  <Text style={styles.avatar}>{cleaner.avatar}</Text>
+                  {!cleaner.available && (
+                    <View style={styles.unavailableBadge}>
+                      <Text style={styles.unavailableText}>Indisponível</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.cleanerInfo}>
+                  <Text style={styles.cleanerName}>{cleaner.name}</Text>
+                  <View style={styles.ratingContainer}>
+                    <Text style={styles.rating}>{renderStars(cleaner.rating)}</Text>
+                    <Text style={styles.ratingText}>{cleaner.rating} ({cleaner.reviews} avaliações)</Text>
+                  </View>
+                  <Text style={styles.experience}>{cleaner.experience} de experiência</Text>
+                </View>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.priceValue}>R$ {cleaner.price}</Text>
+                  <Text style={styles.priceUnit}>por hora</Text>
+                </View>
+              </View>
+
+              <Text style={styles.cleanerDescription}>{cleaner.description}</Text>
+
+              <View style={styles.specialtiesContainer}>
+                <Text style={styles.specialtiesTitle}>Especialidades:</Text>
+                <View style={styles.specialtiesList}>
+                  {cleaner.specialties.map((specialty, index) => (
+                    <View key={index} style={styles.specialtyTag}>
+                      <Text style={styles.specialtyText}>{specialty}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {selectedCleanerId === cleaner.id && (
+                <View style={styles.selectedIndicator}>
+                  <Text style={styles.selectedText}>✓ Selecionada</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {/* Resumo do Serviço */}
+        {selectedService && (
+          <View style={styles.serviceResumeContainer}>
+            <Text style={styles.serviceResumeTitle}>📋 Resumo do Seu Pedido</Text>
+            
+            <View style={styles.serviceResumeItem}>
+              <Text style={styles.serviceResumeLabel}>Serviços:</Text>
+              <Text style={styles.serviceResumeValue}>
+                {selectedServices.length} serviço(s) - R$ {serviceTotal}
+              </Text>
+            </View>
+            
+            <View style={styles.serviceResumeItem}>
+              <Text style={styles.serviceResumeLabel}>Data:</Text>
+              <Text style={styles.serviceResumeValue}>{serviceDate}</Text>
+            </View>
+            
+            <View style={styles.serviceResumeItem}>
+              <Text style={styles.serviceResumeLabel}>Horário:</Text>
+              <Text style={styles.serviceResumeValue}>{serviceTime}</Text>
+            </View>
+
+            {selectedCleanerId && (
+              <View style={styles.serviceResumeItem}>
+                <Text style={styles.serviceResumeLabel}>Faxineira:</Text>
+                <Text style={styles.serviceResumeValue}>
+                  {cleaners.find(c => c.id === selectedCleanerId)?.name}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Botão Confirmar */}
+        <TouchableOpacity 
+          style={[
+            styles.confirmButton,
+            !selectedCleanerId && styles.confirmButtonDisabled
+          ]}
+          onPress={handleCleanerConfirm}
+          disabled={!selectedCleanerId}
+        >
+          <Text style={styles.confirmButtonText}>
+            {selectedCleanerId 
+              ? `Continuar com ${cleaners.find(c => c.id === selectedCleanerId)?.name}`
+              : 'Selecione uma faxineira'
+            }
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+
+  // Renderizar a tela atual
+  const renderCurrentScreen = () => {
+    switch (currentScreen) {
+      case 'auth':
+        return renderAuthScreen();
+      case 'location':
+        return renderLocationScreen();
+      case 'service':
+        return renderServiceScreen();
+      case 'cleaner':
+        return renderCleanerScreen();
+      case 'chat':
+        return renderChatScreen();
+      default:
+        return renderHomeScreen();
+    }
+  };
+
+  // Componente Chat inline (temporário)
+  const renderChatScreen = () => (
+    <View style={styles.container}>
+      <View style={styles.authHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setCurrentScreen('cleaner')}
+        >
+          <Text style={styles.backButtonText}>← Voltar</Text>
+        </TouchableOpacity>
+        <Text style={styles.authTitle}>Chat com {selectedCleaner?.name}</Text>
+        <Text style={styles.authSubtitle}>Em breve - chat em tempo real</Text>
+      </View>
+      
+      <View style={styles.authForm}>
+        <View style={styles.locationSection}>
+          <Text style={styles.locationSectionTitle}>💬 Chat</Text>
+          <Text style={styles.locationDescription}>
+            Funcionalidade de chat será implementada na próxima fase
+          </Text>
+          <TouchableOpacity 
+            style={styles.locationButton}
+            onPress={() => setCurrentScreen('home')}
+          >
+            <Text style={styles.locationButtonText}>Voltar ao Início</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Tela inicial (home)
+  const renderHomeScreen = () => (
+    <ScrollView style={styles.container}>
+      <StatusBar backgroundColor="#ff6b6b" barStyle="light-content" />
+      
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Latinas</Text>
+        <Text style={styles.headerSubtitle}>Serviços de Limpeza</Text>
+        
+        {!isLoggedIn && (
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={() => setCurrentScreen('auth')}
+          >
+            <Text style={styles.loginButtonText}>Entrar / Cadastrar</Text>
+          </TouchableOpacity>
+        )}
+        
+        {isLoggedIn && userData && (
+          <View>
+            <Text style={styles.welcomeText}>Bem-vindo, {userData.name}! 👋</Text>
+            <Text style={styles.emailText}>{userData.email}</Text>
+            
+            {userLocation && (
+              <Text style={styles.infoText}>📍 {userLocation.address}</Text>
+            )}
+            
+            {selectedService && (
+              <Text style={styles.infoText}>🎯 {selectedServices.length || 0} serviço(s) - R$ {serviceTotal || selectedService.total || selectedService.price || 0}</Text>
+            )}
+            
+            {selectedCleaner && (
+              <Text style={styles.infoText}>👩‍💼 {selectedCleaner.name}</Text>
+            )}
+            
+            <View style={styles.headerButtons}>
+              <TouchableOpacity 
+                style={[styles.smallButton, {marginRight: 5}]} 
+                onPress={() => setCurrentScreen('location')}
+              >
+                <Text style={styles.smallButtonText}>📍</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.smallButton, {marginRight: 5}]} 
+                onPress={() => setCurrentScreen('service')}
+              >
+                <Text style={styles.smallButtonText}>🎯</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.smallButton, {marginRight: 5}]} 
+                onPress={() => setCurrentScreen('cleaner')}
+              >
+                <Text style={styles.smallButtonText}>👩‍💼</Text>
+              </TouchableOpacity>
+              
+              {selectedCleaner && (
+                <TouchableOpacity 
+                  style={[styles.smallButton, {marginRight: 5}]} 
+                  onPress={() => setCurrentScreen('chat')}
+                >
+                  <Text style={styles.smallButtonText}>💬</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity 
+                style={styles.smallButton} 
+                onPress={() => {
+                  setIsLoggedIn(false);
+                  setUserData(null);
+                  setUserLocation(null);
+                  setSelectedService(null);
+                  setSelectedCleaner(null);
+                }}
+              >
+                <Text style={styles.smallButtonText}>🚪</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Serviços Residenciais</Text>
+        <View style={styles.servicesGrid}>
+          {services.map((service) => (
+            <TouchableOpacity
+              key={service.id}
+              style={styles.serviceCard}
+              onPress={() => {
+                if (isLoggedIn) {
+                  setCurrentScreen('service');
+                } else {
+                  setCurrentScreen('auth');
+                }
+              }}
+            >
+              <Text style={styles.serviceName}>{service.name}</Text>
+              <Text style={styles.servicePrice}>R$ {service.price}</Text>
+              <Text style={styles.serviceDescription}>{service.description}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Serviços Comerciais</Text>
+        {commercialServices.map((service) => (
+          <TouchableOpacity
+            key={service.id}
+            style={styles.commercialCard}
+            onPress={() => {
+              if (isLoggedIn) {
+                setCurrentScreen('service');
+              } else {
+                setCurrentScreen('auth');
+              }
+            }}
+          >
+            <View style={styles.commercialHeader}>
+              <Text style={styles.commercialIcon}>{service.icon}</Text>
+              <View style={styles.commercialInfo}>
+                <Text style={styles.commercialName}>{service.name}</Text>
+                <Text style={styles.commercialDuration}>{service.duration}</Text>
+              </View>
+              <Text style={styles.commercialPrice}>R$ {service.basePrice}</Text>
+            </View>
+            <Text style={styles.commercialDescription}>{service.description}</Text>
+            <View style={styles.includesList}>
+              {service.includes.map((item, index) => (
+                <Text key={index} style={styles.includesItem}>• {item}</Text>
+              ))}
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Serviços Adicionais</Text>
+        <View style={styles.servicesGrid}>
+          {additionalServices.map((service) => (
+            <TouchableOpacity
+              key={service.id}
+              style={styles.serviceCard}
+              onPress={() => {
+                if (isLoggedIn) {
+                  setCurrentScreen('service');
+                } else {
+                  setCurrentScreen('auth');
+                }
+              }}
+            >
+              <Text style={styles.serviceName}>{service.name}</Text>
+              <Text style={styles.servicePrice}>R$ {service.price}</Text>
+              <Text style={styles.serviceDescription}>{service.description}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Pós-Obra</Text>
+        <TouchableOpacity
+          style={styles.posObraCard}
           onPress={() => {
-            Alert.alert(
-              '🚨 Limpeza Urgente',
-              'Conectando via WhatsApp para atendimento imediato!',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'WhatsApp Urgente', onPress: () => {
-                  const urgentMessage = `🚨 LIMPEZA URGENTE! 🚨
-
-Preciso de limpeza HOJE em Brasília, DF!
-
-📍 Endereço: (informe seu endereço)
-⏰ Para quando: HOJE / Horário: (informe)
-🏠 Tipo: (residencial/comercial)
-📱 Contato: (seu telefone)
-
-É URGENTE! Aguardo contato imediato!`;
-                  openWhatsApp(WHATSAPP_NUMBER, urgentMessage);
-                }}]
-            );
+            if (isLoggedIn) {
+              setCurrentScreen('service');
+            } else {
+              setCurrentScreen('auth');
+            }
           }}
         >
-          <ThemedText style={styles.emergencyText}>🚨 Urgente</ThemedText>
+          <Text style={styles.posObraIcon}>🔨</Text>
+          <Text style={styles.posObraName}>Pós-Obra</Text>
+          <Text style={styles.posObraDescription}>Limpeza completa após obras e reformas</Text>
         </TouchableOpacity>
-      </ThemedView>
-    </ThemedView>
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>💝 Feito com amor para facilitar sua vida</Text>
+        <Text style={styles.footerSubtext}>
+          {isLoggedIn ? `Logado como: ${userData?.name}` : 'Faça login para acessar todos os recursos!'}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <View style={styles.appContainer}>
+      {renderCurrentScreen()}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  mapBg: { position: 'absolute', width: '100%', height: '100%', backgroundColor: '#e8f4f8' },
-  mapBgText: { position: 'absolute', top: 50, left: 20, fontSize: 16, fontWeight: 'bold' },
-  bgPins: { position: 'absolute', top: 100, left: 100, gap: 20 },
-  overlay: { flex: 1, backgroundColor: 'rgba(255,255,255,0.95)' },
-  topBar: { padding: 20, paddingTop: 50, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#eee' },
-  appTitle: { fontSize: 28, fontWeight: 'bold', color: '#2196F3', textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#666', textAlign: 'center', marginTop: 4 },
-  headerWhatsappBtn: { backgroundColor: '#25D366', padding: 12, borderRadius: 8, marginTop: 12, alignItems: 'center' },
-  headerWhatsappText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  mainCard: { backgroundColor: 'white', margin: 20, borderRadius: 16, padding: 20, elevation: 5 },
-  cardTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
-  cardSubtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  serviceBtn: { width: '47%', backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e3e3e3' },
-  icon: { fontSize: 24, marginBottom: 8 },
-  serviceName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 },
-  servicePrice: { fontSize: 12, color: '#4CAF50', fontWeight: '600', marginBottom: 4 },
-  whatsappLabel: { fontSize: 10, color: '#25D366', fontWeight: 'bold' },
-  actions: { flexDirection: 'row', gap: 12 },
-  primaryBtn: { flex: 1, backgroundColor: '#2196F3', padding: 16, borderRadius: 12, alignItems: 'center' },
-  primaryText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  whatsappBtn: { flex: 1, backgroundColor: '#25D366', padding: 16, borderRadius: 12, alignItems: 'center' },
-  whatsappBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  emergency: { position: 'absolute', bottom: 30, right: 20, backgroundColor: '#f44336', padding: 16, borderRadius: 30, elevation: 8 },
-  emergencyText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
-  header: { backgroundColor: '#2196F3', padding: 20, paddingTop: 50, flexDirection: 'row', alignItems: 'center' },
-  backBtn: { color: 'white', fontSize: 16, marginRight: 16 },
-  title: { color: 'white', fontSize: 20, fontWeight: 'bold', flex: 1 },
-  whatsappHeaderBtn: { color: 'white', fontSize: 14, fontWeight: 'bold', backgroundColor: '#25D366', padding: 8, borderRadius: 6 },
-  mapArea: { flex: 1, backgroundColor: '#e8f4f8', padding: 20 },
-  mapTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  mapSubtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  pins: { gap: 10 },
-  pin: { backgroundColor: 'white', padding: 8, borderRadius: 8, fontSize: 12 },
-  listArea: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: 400 },
-  listTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  cleanerCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#f8f9fa', borderRadius: 12, marginBottom: 12 },
-  cleanerName: { fontSize: 16, fontWeight: 'bold' },
-  price: { color: '#4CAF50', fontWeight: 'bold' },
-  cleanerActions: { alignItems: 'flex-end' },
-  available: { fontSize: 12, color: '#4CAF50' },
-  whatsappIcon: { fontSize: 12, color: '#25D366', fontWeight: 'bold', marginTop: 4 },
-  centralWhatsappBtn: { backgroundColor: '#25D366', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 16 },
-  centralWhatsappText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  chatArea: { flex: 1, padding: 16 },
-  aiMsg: { backgroundColor: 'white', padding: 16, borderRadius: 16, marginBottom: 16, alignSelf: 'flex-start', maxWidth: '85%' },
-  userMsg: { backgroundColor: '#2196F3', padding: 16, borderRadius: 16, marginBottom: 16, alignSelf: 'flex-end', maxWidth: '85%' },
-  aiName: { fontSize: 12, fontWeight: 'bold', marginBottom: 8 },
-  userText: { color: 'white' },
-  quickActions: { flexDirection: 'row', padding: 16, gap: 12, backgroundColor: 'white' },
-  quickBtn: { flex: 1, backgroundColor: '#e3f2fd', padding: 12, borderRadius: 8, alignItems: 'center' },
-  whatsappQuickText: { color: '#25D366', fontWeight: 'bold' }
+  appContainer: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    backgroundColor: '#ff6b6b',
+    padding: 20,
+    paddingTop: 40,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'white',
+    opacity: 0.9,
+    marginBottom: 15,
+  },
+  loginButton: {
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  loginButtonText: {
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  welcomeText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  emailText: {
+    color: 'white',
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 10,
+  },
+  infoText: {
+    color: 'white',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 3,
+    opacity: 0.9,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  smallButton: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 15,
+    marginHorizontal: 2,
+  },
+  smallButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+
+  // Auth Screen Styles
+  authHeader: {
+    backgroundColor: '#ff6b6b',
+    padding: 30,
+    paddingTop: 60,
+    alignItems: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 60,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  authTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  authSubtitle: {
+    fontSize: 16,
+    color: 'white',
+    opacity: 0.9,
+    textAlign: 'center',
+  },
+  authForm: {
+    padding: 20,
+    paddingTop: 30,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#e1e1e1',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  inputError: {
+    borderColor: '#ff4757',
+  },
+  errorText: {
+    color: '#ff4757',
+    fontSize: 14,
+    marginTop: 5,
+    marginLeft: 5,
+  },
+  submitButton: {
+    backgroundColor: '#ff6b6b',
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#ccc',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  switchButton: {
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  switchButtonText: {
+    color: '#666',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  switchButtonHighlight: {
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+  },
+
+  // Location Screen Styles
+  locationSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  locationSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  locationDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  locationButton: {
+    backgroundColor: '#ff6b6b',
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  locationButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  locationResult: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  locationResultTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 5,
+  },
+  locationResultText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 10,
+  },
+  confirmLocationButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmLocationText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    paddingHorizontal: 15,
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  suggestedLocation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  suggestedLocationText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  suggestedLocationArrow: {
+    fontSize: 16,
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+  },
+
+  // Service Selection Styles
+  serviceCategory: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  serviceCategoryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  serviceOption: {
+    borderWidth: 2,
+    borderColor: '#e1e1e1',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+  },
+  serviceOptionSelected: {
+    borderColor: '#ff6b6b',
+    backgroundColor: '#fff5f5',
+  },
+  serviceOptionContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  serviceOptionInfo: {
+    flex: 1,
+  },
+  serviceOptionName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  serviceOptionDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  serviceOptionRight: {
+    alignItems: 'center',
+  },
+  serviceOptionPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: '#ff6b6b',
+    borderColor: '#ff6b6b',
+  },
+  checkmark: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dateTimeItem: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  suggestedTimesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  suggestedTimes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  timeButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  timeButtonSelected: {
+    backgroundColor: '#ff6b6b',
+    borderColor: '#ff6b6b',
+  },
+  timeButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  timeButtonTextSelected: {
+    color: 'white',
+  },
+  summaryContainer: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b6b',
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  summaryItemName: {
+    fontSize: 14,
+    color: '#333',
+  },
+  summaryItemPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
+  summaryTotal: {
+    paddingTop: 15,
+    alignItems: 'center',
+  },
+  summaryTotalText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
+  confirmButton: {
+    backgroundColor: '#ff6b6b',
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#ccc',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  // Cleaner Selection Styles
+  cleanerCard: {
+    marginBottom: 15,
+  },
+  cleanerCardContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  cleanerCardSelected: {
+    borderColor: '#ff6b6b',
+    backgroundColor: '#fff5f5',
+  },
+  cleanerCardUnavailable: {
+    opacity: 0.6,
+    backgroundColor: '#f8f9fa',
+  },
+  cleanerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  avatarContainer: {
+    marginRight: 15,
+    position: 'relative',
+  },
+  avatar: {
+    fontSize: 40,
+  },
+  unavailableBadge: {
+    position: 'absolute',
+    bottom: -5,
+    right: -5,
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  unavailableText: {
+    color: 'white',
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  cleanerInfo: {
+    flex: 1,
+  },
+  cleanerName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  rating: {
+    fontSize: 14,
+    marginRight: 5,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  experience: {
+    fontSize: 14,
+    color: '#666',
+  },
+  priceContainer: {
+    alignItems: 'center',
+  },
+  priceValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
+  priceUnit: {
+    fontSize: 12,
+    color: '#666',
+  },
+  cleanerDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+  specialtiesContainer: {
+    marginBottom: 10,
+  },
+  specialtiesTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  specialtiesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  specialtyTag: {
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 15,
+    marginRight: 8,
+    marginBottom: 5,
+  },
+  specialtyText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '500',
+  },
+  selectedIndicator: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  selectedText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  serviceResumeContainer: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b6b',
+  },
+  serviceResumeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  serviceResumeItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
+  serviceResumeLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  serviceResumeValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
+  },
+
+  // Other styles
+  section: {
+    margin: 15,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  servicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  serviceCard: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    width: '48%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  servicePrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    marginBottom: 5,
+  },
+  serviceDescription: {
+    fontSize: 12,
+    color: '#666',
+  },
+  commercialCard: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  commercialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  commercialIcon: {
+    fontSize: 30,
+    marginRight: 15,
+  },
+  commercialInfo: {
+    flex: 1,
+  },
+  commercialName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  commercialDuration: {
+    fontSize: 14,
+    color: '#666',
+  },
+  commercialPrice: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
+  commercialDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  includesList: {
+    marginTop: 5,
+  },
+  includesItem: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  posObraCard: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  posObraIcon: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  posObraName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  posObraDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  footer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  footerSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
 });
