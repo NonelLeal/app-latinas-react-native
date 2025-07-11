@@ -48,6 +48,11 @@ export default function HomeScreen() {
   // Estados para o CleanerSelection
   const [selectedCleanerId, setSelectedCleanerId] = useState(null);
 
+  // Estados para o Chat
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
   // Dados das faxineiras
   const cleaners = [
     {
@@ -387,6 +392,16 @@ export default function HomeScreen() {
 
     const cleaner = cleaners.find(c => c.id === selectedCleanerId);
     setSelectedCleaner(cleaner);
+    
+    // Inicializar chat com mensagem de boas-vindas
+    const welcomeMessage = {
+      id: '1',
+      text: `Olá! Sou a ${cleaner.name}. Como posso te ajudar hoje?`,
+      sender: 'cleaner',
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages([welcomeMessage]);
+    
     setCurrentScreen('chat');
     
     Alert.alert(
@@ -407,6 +422,56 @@ export default function HomeScreen() {
       stars.push('✨');
     }
     return stars.join('');
+  };
+
+  // Funções do Chat
+  const sendMessage = () => {
+    if (inputText.trim() === '') return;
+
+    const newMessage = {
+      id: Date.now().toString(),
+      text: inputText.trim(),
+      sender: 'user',
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setInputText('');
+    
+    // Simular resposta da faxineira
+    setTimeout(() => {
+      setIsTyping(true);
+      setTimeout(() => {
+        const responses = [
+          'Perfeito! Vou anotar isso.',
+          'Entendi! Posso ajudar com certeza.',
+          'Ótimo! Vou preparar tudo para o serviço.',
+          'Sem problemas! Tenho experiência com isso.',
+          'Combinado! Até o dia do serviço.',
+          'Pode deixar comigo!',
+          'Vou caprichar na limpeza!',
+          'Obrigada pela confiança!',
+          'Vou levar todos os produtos necessários.',
+          'Que horário é melhor para você?'
+        ];
+        
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        
+        const cleanerResponse = {
+          id: Date.now().toString(),
+          text: randomResponse,
+          sender: 'cleaner',
+          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        };
+        
+        setMessages(prev => [...prev, cleanerResponse]);
+        setIsTyping(false);
+      }, 1500);
+    }, 1000);
+  };
+
+  const selectQuickMessage = (message) => {
+    setInputText(message);
   };
 
   // Componente AuthScreen inline
@@ -946,34 +1011,119 @@ export default function HomeScreen() {
     }
   };
 
-  // Componente Chat inline (temporário)
+  // Componente Chat inline completo
   const renderChatScreen = () => (
     <View style={styles.container}>
-      <View style={styles.authHeader}>
+      {/* Header do Chat */}
+      <View style={styles.chatHeader}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => setCurrentScreen('cleaner')}
         >
           <Text style={styles.backButtonText}>← Voltar</Text>
         </TouchableOpacity>
-        <Text style={styles.authTitle}>Chat com {selectedCleaner?.name}</Text>
-        <Text style={styles.authSubtitle}>Em breve - chat em tempo real</Text>
-      </View>
-      
-      <View style={styles.authForm}>
-        <View style={styles.locationSection}>
-          <Text style={styles.locationSectionTitle}>💬 Chat</Text>
-          <Text style={styles.locationDescription}>
-            Funcionalidade de chat será implementada na próxima fase
+        <View style={styles.chatHeaderInfo}>
+          <Text style={styles.chatCleanerName}>
+            {selectedCleaner?.avatar} {selectedCleaner?.name}
           </Text>
-          <TouchableOpacity 
-            style={styles.locationButton}
-            onPress={() => setCurrentScreen('home')}
-          >
-            <Text style={styles.locationButtonText}>Voltar ao Início</Text>
-          </TouchableOpacity>
+          <Text style={styles.chatStatus}>● Online</Text>
         </View>
+        <TouchableOpacity style={styles.callButton}>
+          <Text style={styles.callButtonText}>📞</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Lista de Mensagens */}
+      <ScrollView style={styles.messagesContainer} showsVerticalScrollIndicator={false}>
+        {messages.map((message) => {
+          const isUser = message.sender === 'user';
+          return (
+            <View
+              key={message.id}
+              style={[
+                styles.messageContainer,
+                isUser ? styles.userMessage : styles.cleanerMessage
+              ]}
+            >
+              <View style={[
+                styles.messageBubble,
+                isUser ? styles.userBubble : styles.cleanerBubble
+              ]}>
+                <Text style={[
+                  styles.messageText,
+                  isUser ? styles.userText : styles.cleanerText
+                ]}>
+                  {message.text}
+                </Text>
+                <Text style={[
+                  styles.messageTime,
+                  isUser ? styles.userTime : styles.cleanerTime
+                ]}>
+                  {message.time}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+        
+        {isTyping && (
+          <View style={[styles.messageContainer, styles.cleanerMessage]}>
+            <View style={[styles.messageBubble, styles.cleanerBubble]}>
+              <Text style={styles.typingText}>
+                <Text style={styles.typingDots}>●●●</Text> digitando...
+              </Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Mensagens Rápidas */}
+      <ScrollView 
+        horizontal 
+        style={styles.quickMessages}
+        showsHorizontalScrollIndicator={false}
+      >
+        {[
+          'Quando você pode vir?',
+          'Quanto tempo leva?',
+          'Preciso de produtos de limpeza?',
+          'Posso deixar as chaves?',
+          'Obrigado!',
+          'Confirmar horário',
+          'Alterar data'
+        ].map((msg, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.quickMessageButton}
+            onPress={() => selectQuickMessage(msg)}
+          >
+            <Text style={styles.quickMessageText}>{msg}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Input de Mensagem */}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.inputContainer}
+      >
+        <TextInput
+          style={styles.textInput}
+          placeholder="Digite sua mensagem..."
+          placeholderTextColor="#999"
+          value={inputText}
+          onChangeText={setInputText}
+          multiline
+          maxLength={500}
+        />
+        <TouchableOpacity
+          style={[styles.sendButton, !inputText.trim() && styles.disabledSendButton]}
+          onPress={sendMessage}
+          disabled={!inputText.trim()}
+        >
+          <Text style={styles.sendButtonText}>Enviar</Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
     </View>
   );
 
@@ -1799,6 +1949,155 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'right',
+  },
+
+  // Chat Styles
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    paddingTop: 40,
+  },
+  chatHeaderInfo: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  chatCleanerName: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  chatStatus: {
+    color: '#90EE90',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  callButton: {
+    padding: 8,
+  },
+  callButtonText: {
+    fontSize: 20,
+  },
+  messagesContainer: {
+    flex: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    backgroundColor: '#f0f0f0',
+  },
+  messageContainer: {
+    marginBottom: 10,
+  },
+  userMessage: {
+    alignItems: 'flex-end',
+  },
+  cleanerMessage: {
+    alignItems: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  userBubble: {
+    backgroundColor: '#ff6b6b',
+    borderBottomRightRadius: 5,
+  },
+  cleanerBubble: {
+    backgroundColor: 'white',
+    borderBottomLeftRadius: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  userText: {
+    color: 'white',
+  },
+  cleanerText: {
+    color: '#333',
+  },
+  messageTime: {
+    fontSize: 11,
+    marginTop: 5,
+    opacity: 0.7,
+  },
+  userTime: {
+    color: 'white',
+    textAlign: 'right',
+  },
+  cleanerTime: {
+    color: '#666',
+  },
+  typingText: {
+    color: '#666',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  typingDots: {
+    color: '#ff6b6b',
+  },
+  quickMessages: {
+    backgroundColor: 'white',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  quickMessageButton: {
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  quickMessageText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: 'white',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  textInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 16,
+    maxHeight: 100,
+    marginRight: 10,
+    backgroundColor: '#f9f9f9',
+  },
+  sendButton: {
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  disabledSendButton: {
+    backgroundColor: '#ccc',
+  },
+  sendButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 
   // Other styles
